@@ -11,8 +11,15 @@ const crypto = require('crypto');
 const fs = require('fs').promises;
 const path = require('path');
 
-// SendGrid 邮件服务
-const sgMail = require('@sendgrid/mail');
+// SendGrid 邮件服务 - 可选依赖
+let sgMail = null;
+try {
+  sgMail = require('@sendgrid/mail');
+  console.log('✅ SendGrid module loaded successfully');
+} catch (err) {
+  console.warn('⚠️  @sendgrid/mail not installed. Email sending disabled.');
+  console.warn('   Run: npm install @sendgrid/mail');
+}
 
 const app = express();
 app.use(express.json());
@@ -21,10 +28,12 @@ app.use(express.json());
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@tokensales.ai';
 
-// 初始化 SendGrid（如果配置了 API Key）
-if (SENDGRID_API_KEY) {
+// 初始化 SendGrid（如果模块和 API Key 都配置了）
+if (sgMail && SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);
   console.log('✅ SendGrid initialized successfully');
+} else if (!sgMail) {
+  console.warn('⚠️  SendGrid module not available. Emails will be logged but not sent.');
 } else {
   console.warn('⚠️  SENDGRID_API_KEY not set. Emails will be logged but not sent.');
 }
@@ -150,11 +159,17 @@ print(response.choices[0].message.content)</div>
  * @returns {Promise<boolean>} 是否发送成功
  */
 async function sendWelcomeEmail(email, apiKey) {
-  // 如果没有配置 SendGrid，只记录日志
-  if (!SENDGRID_API_KEY) {
+  // 如果没有配置 SendGrid 或模块未加载，只记录日志
+  if (!sgMail || !SENDGRID_API_KEY) {
     console.log(`[EMAIL MOCK] Would send welcome email to: ${email}`);
     console.log(`[EMAIL MOCK] API Key: ${apiKey}`);
-    return true;
+    console.log(`[EMAIL MOCK] FROM_EMAIL: ${FROM_EMAIL}`);
+    if (!sgMail) {
+      console.log(`[EMAIL MOCK] Reason: @sendgrid/mail module not installed`);
+    } else if (!SENDGRID_API_KEY) {
+      console.log(`[EMAIL MOCK] Reason: SENDGRID_API_KEY not configured`);
+    }
+    return true; // 返回 true 表示"已处理"，不阻塞流程
   }
   
   const msg = {
